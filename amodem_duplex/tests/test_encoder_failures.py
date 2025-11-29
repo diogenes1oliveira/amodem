@@ -37,9 +37,13 @@ class TestEncoderFailures:
 
     def test_empty_packet(self, enc: encoder.StreamEncoder):
         enc.feed_packet(b"")
-        result = enc.has_data()
 
-        assert result is False
+        # Even empty packets have framing overhead (EOF frame), so has_data() returns True
+        assert enc.has_data() is True
+
+        # Should be able to get the framed empty packet
+        chunk = enc.get_pcm_chunk()
+        assert chunk is not None
 
     def test_feed_packet_with_none(self, enc: encoder.StreamEncoder):
         with pytest.raises(TypeError):

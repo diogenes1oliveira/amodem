@@ -150,8 +150,13 @@ class StreamEncoder:
     def get_pcm_chunk(self, flush: bool = False) -> Optional[npt.NDArray[np.float64]]:
         """Get the next PCM chunk to transmit.
 
+        Automatically returns partial chunks (< chunk_samples) when there are no
+        more packets queued and no more bits to process, making the API more
+        convenient for streaming use cases.
+
         Args:
-            flush: If True, return any remaining samples even if less than chunk_samples
+            flush: If True, force return any remaining samples even if more data
+                   might be coming. Used for explicit end-of-transmission.
 
         Returns:
             PCM chunk as numpy array, or None if no data available
@@ -159,17 +164,29 @@ class StreamEncoder:
         # Process any remaining packets
         self._process_packets()
 
-        # Check if we have enough samples (or flush requested with any samples)
-        if not flush and self.pcm_buffer_len < self.chunk_samples:
-            return None
-
         if self.pcm_buffer_len == 0:
             return None
 
-        # Collect chunks until we have enough samples (or all if flushing)
+        # Determine if we should auto-flush PARTIAL chunks
+        # Auto-flush only applies when buffer < chunk_samples
+        no_more_data_coming = len(self.packet_queue) == 0 and len(self.bit_buffer) == 0
+        should_auto_flush = no_more_data_coming and self.pcm_buffer_len > 0 and self.pcm_buffer_len < self.chunk_samples
+
+        # Check if we have enough samples for a full chunk
+        if not flush and not should_auto_flush and self.pcm_buffer_len < self.chunk_samples:
+            return None
+
+        # Determine target samples
+        # For full chunks or explicit flush, return all available
+        # For partial auto-flush, return what's available
+        if flush or should_auto_flush:
+            target_samples = self.pcm_buffer_len
+        else:
+            target_samples = self.chunk_samples
+
+        # Collect chunks until we have enough samples
         chunks_to_concat: List[npt.NDArray[np.float64]] = []
         samples_collected = 0
-        target_samples = self.chunk_samples if not flush else self.pcm_buffer_len
 
         while self.pcm_chunks and samples_collected < target_samples:
             chunk = self.pcm_chunks[0]
@@ -199,13 +216,23 @@ class StreamEncoder:
     def has_data(self) -> bool:
         """Check if there is data available to transmit.
 
+        Returns True when either:
+        - There are >= chunk_samples available, OR
+        - There are any samples available and no more data is coming
+
         Returns:
             True if get_pcm_chunk() will return data, False otherwise
         """
         # Process any remaining packets
         self._process_packets()
 
-        return self.pcm_buffer_len >= self.chunk_samples
+        # Return True if we have a full chunk
+        if self.pcm_buffer_len >= self.chunk_samples:
+            return True
+
+        # Return True if we have partial data and nothing more is coming
+        no_more_data_coming = len(self.packet_queue) == 0 and len(self.bit_buffer) == 0
+        return no_more_data_coming and self.pcm_buffer_len > 0
 
     def needs_preamble(self) -> bool:
         """Check if a preamble should be sent based on elapsed time.

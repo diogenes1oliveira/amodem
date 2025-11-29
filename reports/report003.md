@@ -245,16 +245,6 @@ def test_scenario(self, enc, dec):
 
 **Future Work:** Implement concurrent preamble detection even in LOCKED state.
 
-### 2. Encoder Requires Explicit Flush
-
-**Status:** Working, but requires awareness
-
-**Issue:** Encoder's `has_data()` doesn't account for partial chunks < `chunk_samples`.
-
-**Workaround:** Call `get_pcm_chunk(flush=True)` after encoding all packets.
-
-**Impact:** Low - documented in tests and straightforward to use.
-
 ## Validation
 
 ### Manual Testing
@@ -290,6 +280,68 @@ All existing 148 tests still pass:
 ✅ **No over-engineering** - Didn't refactor entire decoder, just fixed frame extraction  
 ✅ **Actually test it** - Ran pytest on all tests, no manual testing claims  
 ✅ **Type annotations** - Maintained existing type safety throughout
+
+## Encoder Auto-Flush Improvement
+
+**Date:** 2025-11-29 (Follow-up improvement)
+
+### Problem
+
+The initial fix required explicit `flush=True` calls to retrieve final partial chunks:
+
+```python
+# ❌ Inconvenient - required explicit flush
+while enc.has_data():
+    chunk = enc.get_pcm_chunk()
+    all_pcm.append(chunk)
+final = enc.get_pcm_chunk(flush=True)  # Manually flush last partial chunk
+if final is not None:
+    all_pcm.append(final)
+```
+
+This was awkward for a streaming API and easy to forget.
+
+### Solution
+
+Implemented **automatic flush** logic that detects when no more data is coming:
+
+```python
+def get_pcm_chunk(self, flush: bool = False):
+    # Auto-flush when: buffer < chunk_samples AND no more data coming
+    no_more_data_coming = (
+        len(self.packet_queue) == 0 and len(self.bit_buffer) == 0
+    )
+    should_auto_flush = (
+        no_more_data_coming
+        and self.pcm_buffer_len > 0
+        and self.pcm_buffer_len < self.chunk_samples
+    )
+
+    if should_auto_flush:
+        return partial_chunk  # Automatically return partial chunk
+```
+
+Updated `has_data()` to also account for partial chunks when no more data is coming.
+
+### Result
+
+Natural streaming API - no explicit flush needed:
+
+```python
+# ✅ Clean and intuitive
+while enc.has_data():
+    chunk = enc.get_pcm_chunk()  # Auto-flushes final partial chunk
+    all_pcm.append(chunk)
+```
+
+The encoder intelligently knows when it's safe to return a partial chunk based on internal state (empty packet_queue and bit_buffer).
+
+### Impact
+
+- All realistic scenario tests simplified (removed explicit flush calls)
+- Existing encoder tests updated to allow partial final chunks
+- Empty packet test corrected (empty packets still have framing overhead)
+- API is now more convenient and harder to misuse
 
 ## Conclusion
 

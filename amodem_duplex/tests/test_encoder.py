@@ -109,26 +109,40 @@ class TestStreamEncoder:
         # Should be able to retrieve PCM chunks for all packets
         chunks_retrieved = 0
         max_chunks = 1000  # safety limit
+        chunks = []
 
         while enc.has_data() and chunks_retrieved < max_chunks:
             chunk = enc.get_pcm_chunk()
             assert chunk is not None
-            assert len(chunk) == 640
+            chunks.append(chunk)
             chunks_retrieved += 1
 
         assert chunks_retrieved > 0
+        # All chunks except possibly the last should be 640 samples
+        for i, chunk in enumerate(chunks[:-1]):
+            assert len(chunk) == 640
+        # Last chunk can be partial due to auto-flush
+        assert len(chunks[-1]) <= 640
 
     def test_chunk_size_consistency(self, enc: encoder.StreamEncoder):
         enc.feed_packet(b"Test data" * 100)
 
         chunks_retrieved = 0
         max_chunks = 100
+        chunks = []
 
         while enc.has_data() and chunks_retrieved < max_chunks:
             chunk = enc.get_pcm_chunk()
             assert chunk is not None
-            assert len(chunk) == 640
+            chunks.append(chunk)
             chunks_retrieved += 1
+
+        assert chunks_retrieved > 0
+        # All chunks except possibly the last should be 640 samples
+        for i, chunk in enumerate(chunks[:-1]):
+            assert len(chunk) == 640
+        # Last chunk can be partial due to auto-flush
+        assert len(chunks[-1]) <= 640
 
     def test_needs_preamble_initially_false(self, enc: encoder.StreamEncoder):
         # Preamble should not be needed immediately
@@ -246,11 +260,17 @@ class TestStreamEncoder:
 
         chunks_retrieved = 0
         max_chunks = 10000
+        chunks = []
 
         while enc.has_data() and chunks_retrieved < max_chunks:
             chunk = enc.get_pcm_chunk()
             assert chunk is not None
-            assert len(chunk) == 640
+            chunks.append(chunk)
             chunks_retrieved += 1
 
         assert chunks_retrieved > 10  # Should take many chunks for such a large packet
+        # All chunks except possibly the last should be 640 samples
+        for i, chunk in enumerate(chunks[:-1]):
+            assert len(chunk) == 640
+        # Last chunk can be partial due to auto-flush
+        assert len(chunks[-1]) <= 640

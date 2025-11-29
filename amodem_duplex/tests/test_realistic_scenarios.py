@@ -39,15 +39,11 @@ class TestRealisticScenarios:
         for pkt in packets:
             enc.feed_packet(pkt)
 
+        # Encoder now auto-flushes partial chunks when no more data is coming
         while enc.has_data():
             chunk = enc.get_pcm_chunk()
             if chunk is not None:
                 all_pcm.append(chunk)
-
-        # Get any remaining partial chunk with flush=True
-        final_chunk = enc.get_pcm_chunk(flush=True)
-        if final_chunk is not None:
-            all_pcm.append(final_chunk)
 
         for chunk in all_pcm:
             dec.feed_pcm(chunk)
@@ -250,10 +246,6 @@ class TestRealisticScenarios:
             chunk = enc.get_pcm_chunk()
             if chunk is not None:
                 all_pcm.append(chunk)
-        # Flush any remaining partial chunk
-        final1 = enc.get_pcm_chunk(flush=True)
-        if final1 is not None:
-            all_pcm.append(final1)
 
         enc2 = encoder.StreamEncoder(enc.config, chunk_samples=640)
         preamble2 = list(enc2.emit_preamble())
@@ -264,10 +256,6 @@ class TestRealisticScenarios:
             chunk = enc2.get_pcm_chunk()
             if chunk is not None:
                 preamble2.append(chunk)
-        # Flush any remaining partial chunk
-        final2 = enc2.get_pcm_chunk(flush=True)
-        if final2 is not None:
-            preamble2.append(final2)
 
         for chunk in all_pcm:
             dec.feed_pcm(chunk)
