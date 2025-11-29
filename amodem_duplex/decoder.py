@@ -34,15 +34,28 @@ class StreamDecoder:
     - Can detect heartbeat packets
     """
 
-    def __init__(self, config: amodem.config.Configuration, crc_error_threshold: int = 3) -> None:
+    def __init__(
+        self,
+        config: amodem.config.Configuration,
+        crc_error_threshold: int = 3,
+        preamble_correlation_threshold: float = 0.3,
+        frame_extraction_limit: int = 200,
+        bit_buffer_resync_threshold: int = 4000,
+    ) -> None:
         """Initialize the stream decoder.
 
         Args:
             config: amodem configuration object
             crc_error_threshold: Number of consecutive CRC failures before dropping lock
+            preamble_correlation_threshold: Normalized correlation threshold for preamble detection (0.0-1.0)
+            frame_extraction_limit: Maximum frames to extract per demodulation cycle (safety limit)
+            bit_buffer_resync_threshold: Bit buffer size threshold for triggering resync on CRC errors
         """
         self.config = config
         self.crc_error_threshold = crc_error_threshold
+        self.preamble_correlation_threshold = preamble_correlation_threshold
+        self.frame_extraction_limit = frame_extraction_limit
+        self.bit_buffer_resync_threshold = bit_buffer_resync_threshold
 
         # State
         self.state = DecoderState.SEARCH_PREAMBLE
@@ -118,7 +131,7 @@ class StreamDecoder:
             self.stats["correlation"] = float(norm_corr)
 
             # If strong correlation, transition to LOCKED
-            if norm_corr > 0.3:  # Threshold (tunable)
+            if norm_corr > self.preamble_correlation_threshold:
                 # Find the peak
                 peak_idx = np.argmax(np.abs(correlation))
 
@@ -160,7 +173,7 @@ class StreamDecoder:
             norm_corr = max_corr / (preamble_energy * np.sqrt(preamble_len))
 
             # If strong correlation detected, resync
-            if norm_corr > 0.3:
+            if norm_corr > self.preamble_correlation_threshold:
                 peak_idx = np.argmax(np.abs(correlation))
 
                 # Clear session state for clean resync
@@ -275,8 +288,7 @@ class StreamDecoder:
         bytes_consumed = 0
 
         # Keep extracting packets until we run out of data
-        max_iterations = 200  # Safety limit
-        for _ in range(max_iterations):
+        for _ in range(self.frame_extraction_limit):
             if bytes_consumed >= len(byte_buffer):
                 break
 
@@ -314,7 +326,7 @@ class StreamDecoder:
                     self.stats["crc_errors"] += 1
 
                     # If too many errors, try to resync
-                    if len(self.bit_buffer) > 4000:
+                    if len(self.bit_buffer) > self.bit_buffer_resync_threshold:
                         self.stats["consecutive_errors"] += 1
                         if self.stats["consecutive_errors"] >= self.crc_error_threshold:
                             self.state = DecoderState.SEARCH_PREAMBLE
