@@ -235,7 +235,6 @@ class TestRealisticScenarios:
 
     # ===== Continuous Streaming (5 tests) =====
 
-    @pytest.mark.xfail(reason="Periodic preamble resync while locked not yet implemented")
     def test_streaming_with_periodic_preambles(self, enc: encoder.StreamEncoder, dec: decoder.StreamDecoder):
         packets1 = [b"data1", b"data2", b"data3"]
 

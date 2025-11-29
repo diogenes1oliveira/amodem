@@ -3,7 +3,6 @@
 import collections
 import enum
 import struct
-from typing import Deque, Dict, List, Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -51,11 +50,14 @@ class StreamDecoder:
         # PCM buffer
         self.pcm_buffer: npt.NDArray[np.float64] = np.array([], dtype=np.float64)
 
+        # Separate buffer for preamble detection while locked
+        self.preamble_check_buffer: npt.NDArray[np.float64] = np.array([], dtype=np.float64)
+
         # Packet queue (decoded packets waiting to be retrieved)
-        self.packet_queue: Deque[bytes] = collections.deque()
+        self.packet_queue: collections.deque[bytes] = collections.deque()
 
         # Bit buffer (for frame extraction)
-        self.bit_buffer: List[int] = []
+        self.bit_buffer: list[int] = []
 
         # Stats tracking
         self.stats = {
@@ -66,7 +68,7 @@ class StreamDecoder:
         }
 
         # Demodulation components (created when locked)
-        self.modem: Optional[amodem.dsp.MODEM] = None
+        self.modem: amodem.dsp.MODEM | None = None
 
         # Preamble detection
         self.detector = amodem.detect.Detector(config=config, pylab=amodem.common.Dummy())
@@ -85,6 +87,10 @@ class StreamDecoder:
         if self.state == DecoderState.SEARCH_PREAMBLE:
             self._search_for_preamble()
         elif self.state == DecoderState.LOCKED:
+            # Also accumulate in preamble check buffer for resync detection
+            self.preamble_check_buffer = np.concatenate([self.preamble_check_buffer, samples])
+
+            self._check_preamble_while_locked()
             self._demodulate_locked()
 
     def _search_for_preamble(self) -> None:
@@ -129,6 +135,54 @@ class StreamDecoder:
         if len(self.pcm_buffer) > preamble_len * 3:
             self.pcm_buffer = self.pcm_buffer[-preamble_len * 2 :]
 
+    def _check_preamble_while_locked(self) -> None:
+        """Check for new preamble while locked (for resync)."""
+        preamble_len = len(self.preamble_pcm)
+
+        # Need enough buffer to correlate
+        if len(self.preamble_check_buffer) < preamble_len:
+            return
+
+        # Compute correlation (reuse logic from _search_for_preamble)
+        correlation = np.correlate(
+            (
+                self.preamble_check_buffer[: preamble_len * 2]
+                if len(self.preamble_check_buffer) >= preamble_len * 2
+                else self.preamble_check_buffer
+            ),
+            self.preamble_pcm,
+            mode="valid",
+        )
+
+        if len(correlation) > 0:
+            max_corr = np.max(np.abs(correlation))
+            preamble_energy = np.linalg.norm(self.preamble_pcm)
+            norm_corr = max_corr / (preamble_energy * np.sqrt(preamble_len))
+
+            # If strong correlation detected, resync
+            if norm_corr > 0.3:
+                peak_idx = np.argmax(np.abs(correlation))
+
+                # Clear session state for clean resync
+                self.bit_buffer = []
+                self.packet_queue.clear()
+
+                # Align pcm_buffer to new preamble
+                # The preamble was detected in preamble_check_buffer at peak_idx
+                # We need to clear pcm_buffer and start fresh after the preamble
+                self.pcm_buffer = self.preamble_check_buffer[peak_idx + preamble_len :]
+
+                # Clear preamble check buffer
+                self.preamble_check_buffer = np.array([], dtype=np.float64)
+
+                # Re-initialize demodulation
+                self._init_demodulation()
+                # Stay in LOCKED state
+
+        # Keep preamble check buffer from growing too large
+        if len(self.preamble_check_buffer) > preamble_len * 2:
+            self.preamble_check_buffer = self.preamble_check_buffer[-preamble_len:]
+
     def _init_demodulation(self) -> None:
         """Initialize demodulation components."""
         # Don't consume the buffer yet - keep it for demodulation
@@ -163,7 +217,7 @@ class StreamDecoder:
                     closest_idx = np.argmin(distances)
 
                     # Convert index to bits
-                    bits: List[int] = []
+                    bits: list[int] = []
                     idx = int(closest_idx)
                     for _ in range(self.modem.bits_per_symbol):
                         bits.append(int(idx & 1))
@@ -277,7 +331,7 @@ class StreamDecoder:
         if bits_consumed > 0:
             self.bit_buffer = self.bit_buffer[bits_consumed:]
 
-    def get_packet(self) -> Optional[bytes]:
+    def get_packet(self) -> bytes | None:
         """Extract a decoded packet if available.
 
         Returns:
@@ -295,7 +349,7 @@ class StreamDecoder:
         """
         return self.state
 
-    def get_stats(self) -> Dict[str, float]:
+    def get_stats(self) -> dict[str, float]:
         """Get decoder statistics.
 
         Returns:
