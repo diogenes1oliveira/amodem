@@ -1,4 +1,4 @@
-# Agent Instructions for Kudocker Project
+# Agent Instructions for amodem Project
 
 ## General Guidelines
 
