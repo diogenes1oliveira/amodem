@@ -43,7 +43,13 @@ class StreamEncoder:
             heartbeat_interval: Seconds between heartbeats when idle (default 1.0)
             preamble_interval: Seconds between preambles during transmission (default 3.0)
             clock_func: Clock function for time tracking (default time.monotonic, mockable for tests)
+
+        Raises:
+            ValueError: If chunk_samples is less than 1
         """
+        if chunk_samples < 1:
+            raise ValueError(f"chunk_samples must be at least 1, got {chunk_samples}")
+
         self.config = config
         self.chunk_samples = chunk_samples
         self.heartbeat_interval = heartbeat_interval

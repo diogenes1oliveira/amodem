@@ -175,9 +175,6 @@ class TestLoopbackFailures:
         assert packet1 is None or isinstance(packet1, (bytes, bytearray))
         assert packet2 is None or isinstance(packet2, (bytes, bytearray))
 
-    @pytest.mark.xfail(
-        reason="Known issue: Multiple consecutive packets cause CRC errors (decoder doesn't restart after first EOF)"
-    )
     def test_encoder_reuse_multiple_packets(self, config: amodem.config.Configuration):
         enc = encoder.StreamEncoder(config)
         dec = decoder.StreamDecoder(config)

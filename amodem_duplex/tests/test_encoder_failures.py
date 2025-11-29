@@ -99,23 +99,13 @@ class TestEncoderFailures:
         assert len(chunks2) > 0
         assert len(chunks3) > 0
 
-    @pytest.mark.xfail(reason="Bug: IndexError when chunk_samples=0, should return None gracefully")
     def test_zero_chunk_samples(self, config: amodem.config.Configuration, mock_clock):
-        enc = encoder.StreamEncoder(config, chunk_samples=0, clock_func=mock_clock)
+        with pytest.raises(ValueError, match="chunk_samples must be at least 1"):
+            encoder.StreamEncoder(config, chunk_samples=0, clock_func=mock_clock)
 
-        enc.feed_packet(b"test")
-        chunk = enc.get_pcm_chunk()
-
-        assert chunk is None or len(chunk) == 0
-
-    @pytest.mark.xfail(reason="Bug: IndexError when chunk_samples<0, should return None gracefully")
     def test_negative_chunk_samples(self, config: amodem.config.Configuration, mock_clock):
-        enc = encoder.StreamEncoder(config, chunk_samples=-100, clock_func=mock_clock)
-
-        enc.feed_packet(b"test")
-        chunk = enc.get_pcm_chunk()
-
-        assert chunk is None or len(chunk) == 0
+        with pytest.raises(ValueError, match="chunk_samples must be at least 1"):
+            encoder.StreamEncoder(config, chunk_samples=-100, clock_func=mock_clock)
 
     def test_zero_heartbeat_interval(self, config: amodem.config.Configuration, mock_clock):
         enc = encoder.StreamEncoder(config, heartbeat_interval=0.0, clock_func=mock_clock)
