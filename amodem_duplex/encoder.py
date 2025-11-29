@@ -53,8 +53,9 @@ class StreamEncoder:
         # Packet queue
         self.packet_queue: Deque[bytes] = collections.deque()
 
-        # PCM buffer for output chunks
-        self.pcm_buffer: npt.NDArray[np.float64] = np.array([], dtype=np.float64)
+        # PCM buffer for output chunks - using deque of arrays for efficient appending
+        self.pcm_chunks: Deque[npt.NDArray[np.float64]] = collections.deque()
+        self.pcm_buffer_len: int = 0  # Track total samples without concatenating
 
         # Bit stream buffer (bits waiting to be modulated)
         self.bit_buffer: List[int] = []
@@ -142,8 +143,9 @@ class StreamEncoder:
             symbols = np.array(symbols_list)
             pcm_samples = np.dot(symbols, self.carriers).real
 
-            # Add to PCM buffer
-            self.pcm_buffer = np.concatenate([self.pcm_buffer, pcm_samples])
+            # Add to PCM buffer (efficient - no copying!)
+            self.pcm_chunks.append(pcm_samples)
+            self.pcm_buffer_len += len(pcm_samples)
 
     def get_pcm_chunk(self) -> Optional[npt.NDArray[np.float64]]:
         """Get the next PCM chunk to transmit.
@@ -155,17 +157,37 @@ class StreamEncoder:
         self._process_packets()
 
         # Check if we have enough samples
-        if len(self.pcm_buffer) < self.chunk_samples:
+        if self.pcm_buffer_len < self.chunk_samples:
             return None
 
-        # Extract a chunk
-        chunk = self.pcm_buffer[: self.chunk_samples]
-        self.pcm_buffer = self.pcm_buffer[self.chunk_samples :]
+        # Collect chunks until we have enough samples
+        chunks_to_concat: List[npt.NDArray[np.float64]] = []
+        samples_collected = 0
+
+        while self.pcm_chunks and samples_collected < self.chunk_samples:
+            chunk = self.pcm_chunks[0]
+            needed = self.chunk_samples - samples_collected
+
+            if len(chunk) <= needed:
+                # Take the whole chunk
+                chunks_to_concat.append(chunk)
+                samples_collected += len(chunk)
+                self.pcm_chunks.popleft()
+                self.pcm_buffer_len -= len(chunk)
+            else:
+                # Take part of the chunk and leave the rest
+                chunks_to_concat.append(chunk[:needed])
+                self.pcm_chunks[0] = chunk[needed:]
+                samples_collected += needed
+                self.pcm_buffer_len -= needed
+
+        # Concatenate collected chunks
+        result = np.concatenate(chunks_to_concat) if len(chunks_to_concat) > 1 else chunks_to_concat[0]
 
         # Update transmission time
         self.last_transmission_time = self.clock_func()
 
-        return chunk
+        return result
 
     def has_data(self) -> bool:
         """Check if there is data available to transmit.
@@ -176,7 +198,7 @@ class StreamEncoder:
         # Process any remaining packets
         self._process_packets()
 
-        return len(self.pcm_buffer) >= self.chunk_samples
+        return self.pcm_buffer_len >= self.chunk_samples
 
     def needs_preamble(self) -> bool:
         """Check if a preamble should be sent based on elapsed time.
