@@ -2,10 +2,21 @@
 
 import sys
 
+import click
+
+from amodem_duplex.debugtools import cli as pw_cli
+
+
+@click.group()
+def main() -> None:
+    """amodem_duplex - Audio Modem Duplex Communication"""
+
+
+main.add_command(pw_cli.pw_group)
+
 
 def _main() -> int:
-    """Main entry point for aduplex command."""
-    print("amodem_duplex - Audio Modem Duplex Communication", file=sys.stderr)
+    main()
     return 0
 
 

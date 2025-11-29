@@ -11,7 +11,7 @@
 
 ## Coding Preferences
 
-- IMPORTANT: whatever you need to run some Python command, always use `uv`.
+- IMPORTANT: whatever you need to run some Python command, always use `uv run`.
 - To check out unused imports, use ruff;
 - Format your code with black;
 - Prefer simple, direct implementations over complex class hierarchies
