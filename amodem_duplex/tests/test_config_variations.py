@@ -42,18 +42,6 @@ class TestConfigVariations:
         packet = dec.get_packet()
         assert packet == b"test"
 
-    @pytest.mark.skip(reason="slow() config not available")
-    def test_slow_config(self):
-        pass
-
-    @pytest.mark.skip(reason="fast() config not available")
-    def test_fast_config(self):
-        pass
-
-    @pytest.mark.skip(reason="fastest() config not available")
-    def test_fastest_config(self):
-        pass
-
     @pytest.mark.parametrize("chunk_samples", [64, 320, 640, 1280, 2560])
     def test_various_chunk_sizes(self, config: amodem.config.Configuration, chunk_samples: int):
         enc = encoder.StreamEncoder(config, chunk_samples=chunk_samples)
@@ -87,7 +75,6 @@ class TestConfigVariations:
 
         assert dec.get_state() == decoder.DecoderState.SEARCH_PREAMBLE
 
-    @pytest.mark.slow
     def test_1000_packets_round_trip(self, enc: encoder.StreamEncoder, dec: decoder.StreamDecoder):
         preamble = list(enc.emit_preamble())
         for chunk in preamble:
@@ -98,9 +85,9 @@ class TestConfigVariations:
             enc.feed_packet(test_payload)
 
         while enc.has_data():
-            chunk = enc.get_pcm_chunk()
-            if chunk is not None:
-                dec.feed_pcm(chunk)
+            maybe_chunk = enc.get_pcm_chunk()
+            if maybe_chunk is not None:
+                dec.feed_pcm(maybe_chunk)
 
         packets = []
         for _ in range(15):
@@ -120,9 +107,9 @@ class TestConfigVariations:
             enc.feed_packet(test_payload)
 
         while enc.has_data():
-            chunk = enc.get_pcm_chunk()
-            if chunk is not None:
-                dec.feed_pcm(chunk)
+            maybe_chunk = enc.get_pcm_chunk()
+            if maybe_chunk is not None:
+                dec.feed_pcm(maybe_chunk)
 
         packets = []
         for _ in range(10):
@@ -132,7 +119,6 @@ class TestConfigVariations:
 
         assert len(packets) >= 1
 
-    @pytest.mark.slow
     def test_long_session_memory(self, enc: encoder.StreamEncoder, dec: decoder.StreamDecoder):
         preamble = list(enc.emit_preamble())
         for chunk in preamble:
@@ -142,9 +128,9 @@ class TestConfigVariations:
             enc.feed_packet(b"test")
 
         while enc.has_data():
-            chunk = enc.get_pcm_chunk()
-            if chunk is not None:
-                dec.feed_pcm(chunk)
+            maybe_chunk = enc.get_pcm_chunk()
+            if maybe_chunk is not None:
+                dec.feed_pcm(maybe_chunk)
 
         assert enc is not None
         assert dec is not None

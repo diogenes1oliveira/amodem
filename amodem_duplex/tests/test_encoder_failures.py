@@ -47,15 +47,15 @@ class TestEncoderFailures:
 
     def test_feed_packet_with_none(self, enc: encoder.StreamEncoder):
         with pytest.raises(TypeError):
-            enc.feed_packet(None)
+            enc.feed_packet(None)  # type: ignore[arg-type]
 
     def test_feed_packet_with_string(self, enc: encoder.StreamEncoder):
         with pytest.raises(TypeError):
-            enc.feed_packet("test")
+            enc.feed_packet("test")  # type: ignore[arg-type]
 
     def test_feed_packet_with_int(self, enc: encoder.StreamEncoder):
         with pytest.raises(TypeError):
-            enc.feed_packet(42)
+            enc.feed_packet(42)  # type: ignore[arg-type]
 
     def test_rapid_feed_without_draining(self, enc: encoder.StreamEncoder):
         for i in range(100):
@@ -195,7 +195,6 @@ class TestEncoderFailures:
 
         has_data_before = enc.has_data()
         chunk = enc.get_pcm_chunk()
-        has_data_after = enc.has_data()
 
         assert has_data_before is True
         assert chunk is not None

@@ -238,7 +238,7 @@ class TestLoopbackFailures:
         assert packet is None or isinstance(packet, (bytes, bytearray))
 
     def test_decoder_multiple_locks(self, enc: encoder.StreamEncoder, dec: decoder.StreamDecoder):
-        for i in range(3):
+        for _ in range(3):
             preamble = list(enc.emit_preamble())
             for chunk in preamble:
                 dec.feed_pcm(chunk)
@@ -340,9 +340,9 @@ class TestLoopbackFailures:
             enc.send_heartbeat()
 
         while enc.has_data():
-            chunk = enc.get_pcm_chunk()
-            if chunk is not None:
-                dec.feed_pcm(chunk)
+            maybe_chunk = enc.get_pcm_chunk()
+            if maybe_chunk is not None:
+                dec.feed_pcm(maybe_chunk)
 
         packets = []
         for _ in range(15):

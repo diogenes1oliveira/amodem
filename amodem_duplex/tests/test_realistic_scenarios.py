@@ -10,9 +10,7 @@ These tests demonstrate how amodem_duplex would be used in real applications:
 - Mixed workloads combining multiple patterns
 """
 
-import time
 
-import numpy as np
 import pytest
 
 import amodem.config
@@ -79,11 +77,11 @@ class TestRealisticScenarios:
 
     def test_chat_with_emoji_unicode(self, enc: encoder.StreamEncoder, dec: decoder.StreamDecoder):
         messages = [
-            "Hello 👋".encode("utf-8"),
-            "How are you? 😊".encode("utf-8"),
-            "Great! 🎉".encode("utf-8"),
-            "Coffee? ☕".encode("utf-8"),
-            "Sure! 👍".encode("utf-8"),
+            "Hello 👋".encode(),
+            "How are you? 😊".encode(),
+            "Great! 🎉".encode(),
+            "Coffee? ☕".encode(),
+            "Sure! 👍".encode(),
         ]
 
         decoded = self._encode_and_decode(enc, dec, messages)

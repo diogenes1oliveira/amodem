@@ -2,7 +2,7 @@
 
 import collections
 import time
-from typing import Callable, Deque, Iterator, List, Optional
+from collections.abc import Callable, Iterator
 
 import numpy as np
 import numpy.typing as npt
@@ -51,14 +51,14 @@ class StreamEncoder:
         self.clock_func = clock_func
 
         # Packet queue
-        self.packet_queue: Deque[bytes] = collections.deque()
+        self.packet_queue: collections.deque[bytes] = collections.deque()
 
         # PCM buffer for output chunks - using deque of arrays for efficient appending
-        self.pcm_chunks: Deque[npt.NDArray[np.float64]] = collections.deque()
+        self.pcm_chunks: collections.deque[npt.NDArray[np.float64]] = collections.deque()
         self.pcm_buffer_len: int = 0  # Track total samples without concatenating
 
         # Bit stream buffer (bits waiting to be modulated)
-        self.bit_buffer: List[int] = []
+        self.bit_buffer: list[int] = []
 
         # Framer for packet encoding
         self.framer = amodem.framing.Framer()
@@ -133,7 +133,7 @@ class StreamEncoder:
             self.bit_buffer = self.bit_buffer[bits_per_frame:]
 
             # Encode bits to symbols
-            symbols_list: List[complex] = []
+            symbols_list: list[complex] = []
             for i in range(0, len(frame_bits), bits_per_symbol):
                 symbol_bits = tuple(frame_bits[i : i + bits_per_symbol])
                 symbol = self.modem.encode_map[symbol_bits]
@@ -147,7 +147,7 @@ class StreamEncoder:
             self.pcm_chunks.append(pcm_samples)
             self.pcm_buffer_len += len(pcm_samples)
 
-    def get_pcm_chunk(self, flush: bool = False) -> Optional[npt.NDArray[np.float64]]:
+    def get_pcm_chunk(self, flush: bool = False) -> npt.NDArray[np.float64] | None:
         """Get the next PCM chunk to transmit.
 
         Automatically returns partial chunks (< chunk_samples) when there are no
@@ -185,7 +185,7 @@ class StreamEncoder:
             target_samples = self.chunk_samples
 
         # Collect chunks until we have enough samples
-        chunks_to_concat: List[npt.NDArray[np.float64]] = []
+        chunks_to_concat: list[npt.NDArray[np.float64]] = []
         samples_collected = 0
 
         while self.pcm_chunks and samples_collected < target_samples:

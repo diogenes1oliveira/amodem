@@ -2,7 +2,6 @@
 
 """Tests for stream encoder."""
 
-from collections.abc import Callable
 
 import numpy as np
 import pytest
@@ -119,7 +118,7 @@ class TestStreamEncoder:
 
         assert chunks_retrieved > 0
         # All chunks except possibly the last should be 640 samples
-        for i, chunk in enumerate(chunks[:-1]):
+        for chunk in chunks[:-1]:
             assert len(chunk) == 640
         # Last chunk can be partial due to auto-flush
         assert len(chunks[-1]) <= 640
@@ -139,7 +138,7 @@ class TestStreamEncoder:
 
         assert chunks_retrieved > 0
         # All chunks except possibly the last should be 640 samples
-        for i, chunk in enumerate(chunks[:-1]):
+        for chunk in chunks[:-1]:
             assert len(chunk) == 640
         # Last chunk can be partial due to auto-flush
         assert len(chunks[-1]) <= 640
@@ -270,7 +269,7 @@ class TestStreamEncoder:
 
         assert chunks_retrieved > 10  # Should take many chunks for such a large packet
         # All chunks except possibly the last should be 640 samples
-        for i, chunk in enumerate(chunks[:-1]):
+        for chunk in chunks[:-1]:
             assert len(chunk) == 640
         # Last chunk can be partial due to auto-flush
         assert len(chunks[-1]) <= 640
