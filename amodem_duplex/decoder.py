@@ -2,6 +2,7 @@
 
 import collections
 import enum
+import struct
 from typing import Deque, Dict, List, Optional
 
 import numpy as np
@@ -55,9 +56,6 @@ class StreamDecoder:
 
         # Bit buffer (for frame extraction)
         self.bit_buffer: List[int] = []
-
-        # Framer for packet decoding
-        self.framer = amodem.framing.Framer()
 
         # Stats tracking
         self.stats = {
@@ -196,50 +194,88 @@ class StreamDecoder:
                 self.bit_buffer = []
 
     def _extract_frames(self) -> None:
-        """Try to extract frames from bit buffer."""
-        # Need at least enough bits for frame header (1 byte length + 4 byte CRC + data)
-        # Minimum frame is about 5-6 bytes = 40-48 bits
-        if len(self.bit_buffer) < 48:
+        """Try to extract frames from bit buffer.
+
+        For streaming, we manually parse frames and group them into packets.
+        Each packet consists of data frames followed by an EOF frame.
+        We continue past EOF to extract multiple packets from the stream.
+        """
+        # Need at least minimum frame size (1 byte length + 4 bytes CRC)
+        if len(self.bit_buffer) < 40:  # 5 bytes = 40 bits
             return
 
-        try:
-            # Convert bits to bytes iterator
-            # framing._to_bytes expects an iterator of bits and yields byte lists
-            bits_copy = self.bit_buffer.copy()
-            bytes_iter = amodem.framing._to_bytes(iter(bits_copy))
+        # Convert bits to bytes for easier parsing
+        # Only convert complete bytes (multiples of 8 bits)
+        num_complete_bytes = len(self.bit_buffer) // 8
+        if num_complete_bytes < 5:
+            return
 
-            # Try to decode frames
-            packets_decoded = 0
+        byte_buffer = []
+        for i in range(num_complete_bytes):
+            byte_bits = self.bit_buffer[i * 8 : (i + 1) * 8]
+            byte_val = sum(b << j for j, b in enumerate(byte_bits))
+            byte_buffer.append(byte_val)
 
-            for frame in self.framer.decode(bytes_iter):
-                self.packet_queue.append(frame)
-                self.stats["consecutive_errors"] = 0  # Reset on success
-                packets_decoded += 1
+        framer = amodem.framing.Framer()
+        checksum = framer.checksum
+        bytes_consumed = 0
 
-            # If we successfully decoded, clear the bit buffer
-            if packets_decoded > 0:
-                self.bit_buffer = []
+        # Keep extracting packets until we run out of data
+        max_iterations = 200  # Safety limit
+        for _ in range(max_iterations):
+            if bytes_consumed >= len(byte_buffer):
+                break
 
-        except ValueError:
-            # CRC error or incomplete frame
-            self.stats["crc_errors"] += 1
-            # Don't increment consecutive_errors here - only do that on repeated failures
-            # without any successful decodes in between
+            try:
+                # Read frame header (length byte)
+                length_byte = byte_buffer[bytes_consumed]
+                bytes_consumed += 1
 
-            # Don't clear buffer - might just need more bits
-            # But if we have too many bits without success, try shifting
-            if len(self.bit_buffer) > 4000:
-                # Drop some bits and try to resync
-                self.bit_buffer = self.bit_buffer[800:]
-                self.stats["consecutive_errors"] += 1
+                # Check if we have enough bytes for the frame
+                if bytes_consumed + length_byte > len(byte_buffer):
+                    # Not enough data, rewind and wait for more
+                    bytes_consumed -= 1
+                    break
 
-                # Check if we should drop lock
-                if self.stats["consecutive_errors"] >= self.crc_error_threshold:
-                    self.state = DecoderState.SEARCH_PREAMBLE
+                # Read frame data (CRC + payload)
+                frame_data = bytes(byte_buffer[bytes_consumed : bytes_consumed + length_byte])
+                bytes_consumed += length_byte
 
-        except StopIteration:
-            # Not enough data yet, keep accumulating
-            pass
+                # Decode frame (verify CRC)
+                try:
+                    payload = checksum.decode(frame_data)
+
+                    # Check if this is EOF frame
+                    if payload == framer.EOF:
+                        # EOF found - packet complete, continue to look for next packet
+                        self.stats["consecutive_errors"] = 0
+                        pass  # Continue to next frame/packet
+                    else:
+                        # Data frame - add to queue
+                        self.packet_queue.append(payload)
+                        self.stats["consecutive_errors"] = 0
+
+                except ValueError:
+                    # CRC error
+                    self.stats["crc_errors"] += 1
+
+                    # If too many errors, try to resync
+                    if len(self.bit_buffer) > 4000:
+                        self.stats["consecutive_errors"] += 1
+                        if self.stats["consecutive_errors"] >= self.crc_error_threshold:
+                            self.state = DecoderState.SEARCH_PREAMBLE
+                            self.bit_buffer = []
+                            return
+                    break
+
+            except (IndexError, struct.error):
+                # Not enough data
+                break
+
+        # Remove consumed bits from buffer
+        bits_consumed = bytes_consumed * 8
+        if bits_consumed > 0:
+            self.bit_buffer = self.bit_buffer[bits_consumed:]
 
     def get_packet(self) -> Optional[bytes]:
         """Extract a decoded packet if available.

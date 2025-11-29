@@ -54,7 +54,7 @@ class TestEncoderFailures:
             enc.feed_packet(42)
 
     def test_rapid_feed_without_draining(self, enc: encoder.StreamEncoder):
-        for _ in range(100):
+        for i in range(100):
             enc.feed_packet(b"test" + str(i).encode())
 
         assert enc.has_data()

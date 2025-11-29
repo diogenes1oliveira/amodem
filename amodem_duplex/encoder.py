@@ -147,8 +147,11 @@ class StreamEncoder:
             self.pcm_chunks.append(pcm_samples)
             self.pcm_buffer_len += len(pcm_samples)
 
-    def get_pcm_chunk(self) -> Optional[npt.NDArray[np.float64]]:
+    def get_pcm_chunk(self, flush: bool = False) -> Optional[npt.NDArray[np.float64]]:
         """Get the next PCM chunk to transmit.
+
+        Args:
+            flush: If True, return any remaining samples even if less than chunk_samples
 
         Returns:
             PCM chunk as numpy array, or None if no data available
@@ -156,17 +159,21 @@ class StreamEncoder:
         # Process any remaining packets
         self._process_packets()
 
-        # Check if we have enough samples
-        if self.pcm_buffer_len < self.chunk_samples:
+        # Check if we have enough samples (or flush requested with any samples)
+        if not flush and self.pcm_buffer_len < self.chunk_samples:
             return None
 
-        # Collect chunks until we have enough samples
+        if self.pcm_buffer_len == 0:
+            return None
+
+        # Collect chunks until we have enough samples (or all if flushing)
         chunks_to_concat: List[npt.NDArray[np.float64]] = []
         samples_collected = 0
+        target_samples = self.chunk_samples if not flush else self.pcm_buffer_len
 
-        while self.pcm_chunks and samples_collected < self.chunk_samples:
+        while self.pcm_chunks and samples_collected < target_samples:
             chunk = self.pcm_chunks[0]
-            needed = self.chunk_samples - samples_collected
+            needed = target_samples - samples_collected
 
             if len(chunk) <= needed:
                 # Take the whole chunk
