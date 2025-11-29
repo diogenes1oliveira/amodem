@@ -13,6 +13,7 @@
 
 - IMPORTANT: whatever you need to run some Python command, always use `uv`.
 - To check out unused imports, use ruff;
+- Format your code with black;
 - Prefer simple, direct implementations over complex class hierarchies
 - Don't create new files unless explicitly requested
 - Don't modify existing files beyond what's needed for the specific request
@@ -23,6 +24,8 @@
 - If a types stub is available, you should always try to install it;
 - No need for re-exporting stuff in the `__init__.py`;
 - When adding tests, mirror the main package submodule structure. Also, always add the intermediate `__init__.py`;
+- Always add type annotations. Only exception are the test methods and fixtures: the return value don't need type
+  annotations, but the arguments do.
 
 ## Example
 
