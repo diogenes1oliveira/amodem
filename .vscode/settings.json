@@ -1,0 +1,23 @@
+{
+    "editor.tabSize": 4,
+    "editor.formatOnSave": true,
+    "files.autoSave": "onFocusChange",
+    "makefile.configureOnOpen": false,
+    "editor.rulers": [
+        120
+    ],
+    "[dockerfile]": {
+        "editor.tabSize": 4,
+        "editor.defaultFormatter": "ms-azuretools.vscode-containers",
+        "editor.detectIndentation": false,
+    },
+    "[python]": {
+        "editor.tabSize": 4,
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "always"
+        },
+    },
+    "python.testing.pytestEnabled": true,
+}

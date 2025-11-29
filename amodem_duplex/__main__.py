@@ -11,4 +11,3 @@ def _main() -> int:
 
 if __name__ == "__main__":
     sys.exit(_main())
-
