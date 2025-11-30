@@ -8,6 +8,7 @@
 4. **Ask before expanding**: If you think something might be useful, ask first rather than implementing it
 5. **Don't get stuck in a loop**: If you have to do too much back and forth changing and experimenting, stop and ask me.
    Likely there's some architectural problem.
+6. **Read context first**: When starting work, read relevant plans/, reports/, and AGENTS.md to understand project history before implementing.
 
 ## Coding Preferences
 
@@ -48,4 +49,12 @@ Ask the user: "Should I keep this simple or would you like me to expand on it?"
 - **Define all fixtures at the top of the test class** before any test methods, and use them consistently across all tests
 - **Avoid creating inline test classes** - use fixtures instead. If you need special behavior, configure the fixture's mocks with side_effect rather than creating new fixtures
 - **Don't create additional fixtures unless absolutely necessary** - prefer configuring existing fixtures with mocks, side_effects, or parameter modifications
-- If you changed a test, you are to actually test it; don't just say it's ready for testing unless I tell you I'm gonna test manually.
+- **Actually run tests after writing them**: don't just say "ready for testing" - run pytest, show output, fix failures iteratively until all pass.
+
+## After Implementation
+
+- Run `uv run black` to format all modified files
+- Run `uv run ruff check` and fix all warnings
+- Run full test suite to verify no regressions
+- Delete any old/unused files
+- If there's a plan, write a comprehensive report in reports/ following the style of existing reports (objective, summary, files created/modified/deleted, technical details, validation, success criteria)
