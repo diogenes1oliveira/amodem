@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 import amodem.config
-from amodem_duplex import decoder, encoder, preamble
+from amodem_duplex.protocol import decoder, encoder, preamble
 
 
 class TestDecoderFailures:

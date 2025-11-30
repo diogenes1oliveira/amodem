@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 import amodem.config
-from amodem_duplex import encoder, preamble
+from amodem_duplex.protocol import encoder, preamble
 
 
 class TestStreamEncoder:

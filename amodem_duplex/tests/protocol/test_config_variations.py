@@ -5,7 +5,7 @@
 import pytest
 
 import amodem.config
-from amodem_duplex import decoder, encoder
+from amodem_duplex.protocol import decoder, encoder
 
 
 class TestConfigVariations:

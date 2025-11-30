@@ -14,7 +14,7 @@ These tests demonstrate how amodem_duplex would be used in real applications:
 import pytest
 
 import amodem.config
-from amodem_duplex import decoder, encoder
+from amodem_duplex.protocol import decoder, encoder
 
 
 class TestRealisticScenarios:

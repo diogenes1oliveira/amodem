@@ -5,7 +5,7 @@
 import pytest
 
 import amodem.config
-from amodem_duplex import encoder
+from amodem_duplex.protocol import encoder
 
 
 class TestEncoderFailures:

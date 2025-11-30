@@ -10,7 +10,7 @@ import numpy.typing as npt
 import amodem.config
 import amodem.dsp
 import amodem.framing
-from amodem_duplex import preamble
+from amodem_duplex.protocol import preamble
 
 # Heartbeat marker bytes
 HEARTBEAT_MARKER = b"\x00\x00HEARTBEAT\x00\x00"

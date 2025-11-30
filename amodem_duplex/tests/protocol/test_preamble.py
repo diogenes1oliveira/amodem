@@ -10,7 +10,7 @@ import pytest
 import amodem.config
 import amodem.equalizer
 import amodem.send
-from amodem_duplex import preamble
+from amodem_duplex.protocol import preamble
 
 
 class TestPreambleGeneration:

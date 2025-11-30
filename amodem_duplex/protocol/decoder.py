@@ -10,10 +10,9 @@ import numpy.typing as npt
 import amodem.config
 import amodem.detect
 import amodem.dsp
-import amodem.equalizer
 import amodem.framing
 import amodem.sampling
-from amodem_duplex import encoder, preamble
+from amodem_duplex.protocol import encoder, preamble
 
 
 class DecoderState(enum.Enum):
