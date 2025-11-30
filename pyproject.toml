@@ -13,10 +13,7 @@ description = "Audio Modem Communication Library"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
-dependencies = [
-    "loguru>=0.7.3",
-    "numpy<2",
-]
+dependencies = ["loguru>=0.7.3", "numpy<2", "tabulate>=0.9.0"]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",

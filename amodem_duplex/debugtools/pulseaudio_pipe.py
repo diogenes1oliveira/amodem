@@ -5,6 +5,10 @@ import fnmatch
 import shutil
 import subprocess
 
+import loguru
+
+LOGGER = loguru.logger
+
 
 @dataclasses.dataclass
 class PulseAudioPipe:
@@ -70,6 +74,11 @@ class PulseAudioPipeManager:
 
         sink_module_id = self._create_null_sink(sink_name, sample_rate, channels)
         source_module_id = self._create_remap_source(source_name, f"{sink_name}.monitor")
+
+        LOGGER.info(
+            f"Created pipe '{name}' (sink={sink_name}, source={source_name}, "
+            f"rate={sample_rate}Hz, channels={channels}, sink_module={sink_module_id}, source_module={source_module_id})"
+        )
 
         return PulseAudioPipe(
             id=self._build_pipe_id(name),
@@ -172,6 +181,11 @@ class PulseAudioPipeManager:
         sink_ok = self._unload_module(sink_module_id)
         source_ok = self._unload_module(source_module_id)
 
+        if sink_ok or source_ok:
+            LOGGER.info(f"Deleted pipe '{identifier}' (sink_module={sink_module_id}, source_module={source_module_id})")
+        else:
+            LOGGER.warning(f"Failed to delete pipe '{identifier}'")
+
         return sink_ok or source_ok
 
     def _find_module_id_for_sink(self, sink_name: str) -> int | None:
@@ -217,6 +231,8 @@ class PulseAudioPipeManager:
         for pipe in self.list_all(pattern):
             if self.delete(pipe.id):
                 deleted += 1
+
+        LOGGER.info(f"Deleted {deleted} pipe(s) matching pattern '{pattern}'")
         return deleted
 
     def _create_null_sink(self, sink_name: str, sample_rate: int, channels: int) -> int:

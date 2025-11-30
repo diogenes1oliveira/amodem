@@ -1,6 +1,7 @@
 """CLI entry point for managing PulseAudio debug pipes."""
 
 import click
+from tabulate import tabulate
 
 from .pulseaudio_pipe import PulseAudioPipeManager
 
@@ -51,8 +52,20 @@ def list(
     if not pipes:
         click.echo("No matching pipes found", err=True)
         return
-    for pipe in pipes:
-        _echo_pipe_info(pipe)
+
+    table_data = [
+        [
+            pipe.id,
+            pipe.name,
+            pipe.sink_name,
+            pipe.source_name,
+            pipe.sample_rate,
+            pipe.channels,
+        ]
+        for pipe in pipes
+    ]
+    headers = ["ID", "Name", "Sink", "Source", "Sample Rate", "Channels"]
+    click.echo(tabulate(table_data, headers=headers, tablefmt="simple"), err=True)
 
 
 @pa_group.command()

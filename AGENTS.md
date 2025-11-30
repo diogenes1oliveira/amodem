@@ -27,6 +27,7 @@
 - When adding tests, mirror the main package submodule structure. Also, always add the intermediate `__init__.py`;
 - Always add type annotations. Only exception are the test methods and fixtures: the return value don't need type
   annotations, but the arguments do.
+- **Logging**: Always assign a global `LOGGER = loguru.logger` at the top of each module and use it to log important modifications (creation, deletion, updates, etc). Log at INFO level for successful operations and WARNING/ERROR for failures.
 
 ## Example
 
