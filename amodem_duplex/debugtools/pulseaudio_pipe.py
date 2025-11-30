@@ -12,7 +12,7 @@ LOGGER = loguru.logger
 
 @dataclasses.dataclass
 class PulseAudioPipe:
-    """Represents a virtual PulseAudio pipe (null sink + remap source)."""
+    """Represents a virtual PulseAudio pipe (null sink + remap source + loopback)."""
 
     id: str
     name: str
@@ -20,6 +20,7 @@ class PulseAudioPipe:
     source_name: str
     sink_module_id: int | None
     source_module_id: int | None
+    loopback_module_id: int | None
     sample_rate: int
     channels: int
 
@@ -52,7 +53,14 @@ class PulseAudioPipeManager:
             raise RuntimeError("pactl is not available in PATH")
 
     def create(self, name: str, sample_rate: int = 16000, channels: int = 1) -> PulseAudioPipe:
-        """Create a new PulseAudio pipe (null sink + remap source).
+        """Create a new PulseAudio pipe (null sink + loopback + remap source).
+
+        Creates a bidirectional pipe:
+        1. null-sink (speaker): accepts audio via paplay
+        2. loopback: routes null-sink.monitor → default sink (for playback)
+        3. remap-source (mic): captures from null-sink.monitor via parecord
+
+        This allows paplay → speaker to be heard via mic → parecord.
 
         Args:
             name: Name for the pipe
@@ -72,12 +80,20 @@ class PulseAudioPipeManager:
         sink_name = self._build_entity_name(name, "output")
         source_name = self._build_entity_name(name, "input")
 
+        # Create null sink (speaker)
         sink_module_id = self._create_null_sink(sink_name, sample_rate, channels)
+
+        # Create loopback to route audio from null-sink.monitor to default sink
+        # This makes audio played to the pipe audible
+        loopback_module_id = self._create_loopback(f"{sink_name}.monitor", sample_rate, channels)
+
+        # Create remap source (mic) that monitors the null sink
         source_module_id = self._create_remap_source(source_name, f"{sink_name}.monitor")
 
         LOGGER.info(
             f"Created pipe '{name}' (sink={sink_name}, source={source_name}, "
-            f"rate={sample_rate}Hz, channels={channels}, sink_module={sink_module_id}, source_module={source_module_id})"
+            f"rate={sample_rate}Hz, channels={channels}, sink_module={sink_module_id}, "
+            f"loopback_module={loopback_module_id}, source_module={source_module_id})"
         )
 
         return PulseAudioPipe(
@@ -87,6 +103,7 @@ class PulseAudioPipeManager:
             source_name=source_name,
             sink_module_id=sink_module_id,
             source_module_id=source_module_id,
+            loopback_module_id=loopback_module_id,
             sample_rate=sample_rate,
             channels=channels,
         )
@@ -134,6 +151,7 @@ class PulseAudioPipeManager:
                 source_name=source_name,
                 sink_module_id=None,
                 source_module_id=None,
+                loopback_module_id=None,
                 sample_rate=16000,
                 channels=1,
             )
@@ -175,16 +193,21 @@ class PulseAudioPipeManager:
         # Find module IDs from pactl list modules
         sink_module_id = self._find_module_id_for_sink(pipe.sink_name)
         source_module_id = self._find_module_id_for_source(pipe.source_name)
+        loopback_module_id = self._find_loopback_module_id(f"{pipe.sink_name}.monitor")
 
         sink_ok = self._unload_module(sink_module_id)
         source_ok = self._unload_module(source_module_id)
+        loopback_ok = self._unload_module(loopback_module_id)
 
-        if sink_ok or source_ok:
-            LOGGER.info(f"Deleted pipe '{identifier}' (sink_module={sink_module_id}, source_module={source_module_id})")
+        if sink_ok or source_ok or loopback_ok:
+            LOGGER.info(
+                f"Deleted pipe '{identifier}' (sink_module={sink_module_id}, "
+                f"loopback_module={loopback_module_id}, source_module={source_module_id})"
+            )
         else:
             LOGGER.warning(f"Failed to delete pipe '{identifier}'")
 
-        return sink_ok or source_ok
+        return sink_ok or source_ok or loopback_ok
 
     def _find_module_id_for_sink(self, sink_name: str) -> int | None:
         """Find module ID for a sink by name."""
@@ -247,6 +270,7 @@ class PulseAudioPipeManager:
         Raises:
             RuntimeError: If pactl command fails
         """
+        channel_map = "mono" if channels == 1 else "stereo"
         args = [
             "pactl",
             "load-module",
@@ -255,6 +279,8 @@ class PulseAudioPipeManager:
             f"sink_properties=device.description={sink_name}",
             f"rate={sample_rate}",
             f"channels={channels}",
+            f"channel_map={channel_map}",
+            "format=s16le",
         ]
 
         result = subprocess.run(args, check=True, capture_output=True, text=True)
@@ -284,6 +310,48 @@ class PulseAudioPipeManager:
 
         result = subprocess.run(args, check=True, capture_output=True, text=True)
         return int(result.stdout.strip())
+
+    def _create_loopback(self, source: str, sample_rate: int, channels: int) -> int:
+        """Create loopback module to route audio from source to default sink.
+
+        Args:
+            source: Source to read from (typically a monitor)
+            sample_rate: Sample rate in Hz
+            channels: Number of channels
+
+        Returns:
+            Module ID
+
+        Raises:
+            RuntimeError: If pactl command fails
+        """
+        args = [
+            "pactl",
+            "load-module",
+            "module-loopback",
+            f"source={source}",
+            f"rate={sample_rate}",
+            f"channels={channels}",
+            "latency_msec=1",
+        ]
+
+        result = subprocess.run(args, check=True, capture_output=True, text=True)
+        return int(result.stdout.strip())
+
+    def _find_loopback_module_id(self, source: str) -> int | None:
+        """Find module ID for a loopback by source name."""
+        result = subprocess.run(
+            ["pactl", "list", "modules", "short"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        for line in result.stdout.strip().split("\n"):
+            if "module-loopback" in line and f"source={source}" in line:
+                parts = line.split()
+                if parts:
+                    return int(parts[0])
+        return None
 
     def _unload_module(self, module_id: int | None) -> bool:
         """Unload module using pactl.
