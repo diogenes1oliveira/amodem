@@ -96,11 +96,35 @@ def delete(identifier: str, prefix: str) -> None:
 @pa_group.command(name="delete-all")
 @click.argument("pattern", required=False)
 @click.option("--prefix", default="amodem-test", show_default=True)
-def delete_all(pattern: str | None, prefix: str) -> None:
+@click.option("-f", "--force", is_flag=True, help="Skip confirmation prompt")
+def delete_all(pattern: str | None, prefix: str, force: bool) -> None:
     """Delete all pipes matching PATTERN."""
     manager = PulseAudioPipeManager(prefix=prefix)
-    if not click.confirm("Delete matching pipes?"):
+    pipes = manager.list_all(pattern)
+
+    if not pipes:
+        click.echo("No matching pipes found", err=True)
+        return
+
+    # Show table of pipes to be deleted
+    table_data = [
+        [
+            pipe.id,
+            pipe.name,
+            pipe.sink_name,
+            pipe.source_name,
+            pipe.sample_rate,
+            pipe.channels,
+        ]
+        for pipe in pipes
+    ]
+    headers = ["ID", "Name", "Sink", "Source", "Sample Rate", "Channels"]
+    click.echo(tabulate(table_data, headers=headers, tablefmt="simple"), err=True)
+    click.echo("", err=True)
+
+    if not force and not click.confirm("Delete these pipes?"):
         click.echo("Aborted", err=True)
         return
+
     deleted = manager.delete_all(pattern)
     click.echo(f"Deleted {deleted} pipes", err=True)

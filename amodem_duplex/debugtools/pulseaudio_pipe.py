@@ -98,7 +98,7 @@ class PulseAudioPipeManager:
             pattern: Optional glob pattern to filter pipes
 
         Returns:
-            List of matching pipes
+            List of matching pipes (including orphaned sinks without sources)
         """
         nodes = self._list_nodes()
         sinks: dict[str, int] = {}
@@ -126,9 +126,7 @@ class PulseAudioPipeManager:
                 continue
 
             source_name = self._build_entity_name(pipe_name, "input")
-            if source_name not in sources:
-                continue
-
+            # Include pipes even if source is missing (orphaned sink)
             pipe = PulseAudioPipe(
                 id=self._build_pipe_id(pipe_name),
                 name=pipe_name,
