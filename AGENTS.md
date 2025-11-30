@@ -39,7 +39,8 @@ Ask the user: "Should I keep this simple or would you like me to expand on it?"
 
 ## Testing
 
-- When creating tests, start with just the pytest skeleton, and the test methods with a single pass statement. Only then, ask how to proceed. Don't add comments unless explicitly asked to, because the test names themselves should be descriptive.
+- Always use TDD: create the tests before the code.
+- When creating tests, start with just the pytest skeleton, and the test methods with a single pass statement. Don't add comments unless explicitly asked to, because the test names themselves should be descriptive.
 - Add the `mypy: disable-error-code=no-untyped-def`at the header of all tests. so you don't need to add -> None everywhere.
 - Use the standard setup, act, verify structure in the test method code, in separate blocks. (no need to add the comments describing these names)
 - Prefer using the tmp_path, monkeypatch, etc pytest fixtures over manually setting up tmp paths, import paths, etc
