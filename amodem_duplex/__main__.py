@@ -4,7 +4,7 @@ import sys
 
 import click
 
-from amodem_duplex.debugtools import cli as pw_cli
+from amodem_duplex.debugtools import cli as pa_cli
 
 
 @click.group()
@@ -12,7 +12,7 @@ def main() -> None:
     """amodem_duplex - Audio Modem Duplex Communication"""
 
 
-main.add_command(pw_cli.pw_group)
+main.add_command(pa_cli.pa_group)
 
 
 def _main() -> int:
